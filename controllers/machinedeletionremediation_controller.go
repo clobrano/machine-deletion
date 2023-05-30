@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 
 	v1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -80,7 +81,6 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	log := r.Log.WithValues("machinedeletionremediation", req.NamespacedName)
 
 	log.Info("reconciling...")
-
 	var err error
 	var remediation *v1alpha1.MachineDeletionRemediation
 	if remediation, err = r.getRemediation(ctx, req); remediation == nil || err != nil {
@@ -89,6 +89,9 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		}
 		return ctrl.Result{}, err
 	}
+
+	log.Info("incrementing metrics")
+	reconcilePerCr.With(prometheus.Labels{"custom_resource_name": remediation.Name}).Inc()
 
 	annotations := remediation.GetAnnotations()
 	if annotations != nil {
