@@ -6,7 +6,7 @@ import (
 	"time"
 
 	commonannotations "github.com/medik8s/common/pkg/annotations"
-	comconditions "github.com/medik8s/common/pkg/conditions"
+	commonconditions "github.com/medik8s/common/pkg/conditions"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openshift/api/machine/v1beta1"
@@ -142,8 +143,8 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					// fast to test the initial value ("Started") by inspecting
 					// the actual MDR CR. For this reason the initial value is not
 					// tested here.
-					verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionFalse)
-					verifyStatusCondition(comconditions.SucceededType, metav1.ConditionTrue)
+					verifyStatusCondition(commonconditions.ProcessingType, metav1.ConditionFalse)
+					verifyStatusCondition(commonconditions.SucceededType, metav1.ConditionTrue)
 
 					verifyMachineIsDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
@@ -151,6 +152,31 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(underTest), underTest)).To(Succeed())
 					Expect(underTest.GetAnnotations()).ToNot(BeNil())
 
+				})
+			})
+
+			When("creating a resource in baremetal cluster", func() {
+				BeforeEach(func() {
+					logger := ctrl.Log.WithName("unit test")
+
+					Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(workerNodeMachine), workerNodeMachine)).To(Succeed())
+					logger.Info("before", "workerNodeMachine", workerNodeMachine)
+
+					wmcCopy := workerNodeMachine.DeepCopy()
+					providerID := "baremetal dummy provider ID"
+					wmcCopy.Spec.ProviderID = &providerID
+					logger.Info("meanwhile", "workerNodeMachine", wmcCopy)
+
+					Expect(k8sClient.Patch(context.TODO(), wmcCopy, client.MergeFrom(workerNodeMachine))).To(Succeed())
+					time.Sleep(5 * time.Second)
+					Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(workerNodeMachine), workerNodeMachine)).To(Succeed())
+					logger.Info("after", "workerNodeMachine", workerNodeMachine)
+
+					underTest = createRemediation(workerNode)
+
+				})
+				It("sets PermanentNodeDeletionExpected condition to false", func() {
+					verifyStatusCondition(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionFalse)
 				})
 			})
 		})
@@ -258,8 +284,8 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 
 				It("returns without completing remediation", func() {
-					verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionFalse)
-					verifyStatusCondition(comconditions.SucceededType, metav1.ConditionFalse)
+					verifyStatusCondition(commonconditions.ProcessingType, metav1.ConditionFalse)
+					verifyStatusCondition(commonconditions.SucceededType, metav1.ConditionFalse)
 				})
 			})
 		})

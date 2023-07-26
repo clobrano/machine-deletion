@@ -170,7 +170,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	if providerID == "" {
 		log.Info("Machine does not have ProviderID")
 		permanentNodeDeletionExpectedMsg = machineDeletedOnUnknownProviderMessage
-		status = metav1.ConditionFalse
+		status = metav1.ConditionUnknown
 	} else if strings.HasPrefix(providerID, "baremetal") {
 		permanentNodeDeletionExpectedMsg = machineDeletedOnBareMetalProviderMessage
 		status = metav1.ConditionFalse
